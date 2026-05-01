@@ -1,0 +1,35 @@
+name: Playwright API Tests
+
+on:
+  # Run smoke tests on every push & PR
+  push:
+    branches: [main]
+  pull_request:
+
+  # Allow manual & scheduled regression runs
+  schedule:
+    # Nightly regression run at 2 AM UTC
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: "Which tests to run"
+        required: true
+        default: "smoke"
+        type: choice
+        options:
+          - smoke
+          - regression
+
+jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ✅ Step 1: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ✅ Step 2: Setup Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
