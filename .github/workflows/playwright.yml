@@ -1,15 +1,13 @@
-name: Playwright API Tests
+name: Playwright API Tests with Allure
 
 on:
-  # Run smoke tests on every push & PR
   push:
     branches: [main]
   pull_request:
 
-  # Allow manual & scheduled regression runs
   schedule:
-    # Nightly regression run at 2 AM UTC
     - cron: "0 2 * * *"
+
   workflow_dispatch:
     inputs:
       test_type:
@@ -33,3 +31,56 @@ jobs:
       # ✅ Step 2: Setup Python
       - name: Set up Python
         uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # ✅ Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install
+
+      # ✅ Step 4: Decide which tests to run
+      - name: Set test marker
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "MARKER=regression" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "MARKER=${{ github.event.inputs.test_type }}" >> $GITHUB_ENV
+          else
+            echo "MARKER=smoke" >> $GITHUB_ENV
+          fi
+
+      # ✅ Step 5: Run tests and generate Allure results
+      - name: Run API tests with Allure
+        env:
+          RAWG_API_KEY: ${{ secrets.RAWG_API_KEY }}
+        run: |
+          pytest -m $MARKER -v \
+            --alluredir=allure-results
+
+      # ✅ Step 6: Generate Allure HTML report
+      - name: Generate Allure Report
+        if: always()
+        uses: simple-elf/allure-report-action@v1.8
+        with:
+          allure_results: allure-results
+          allure_report: allure-report
+          keep_reports: 20
+
+      # ✅ Step 7: Upload Allure report as artifact
+      - name: Upload Allure Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-${{ github.run_id }}
+          path: allure-report
+
+      # ✅ Step 8: Upload raw Allure results (useful for debugging)
+      - name: Upload Allure Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ github.run_id }}
+          path: allure-results
